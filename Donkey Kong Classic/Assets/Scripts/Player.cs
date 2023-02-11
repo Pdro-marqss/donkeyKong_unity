@@ -2,6 +2,11 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
+    private SpriteRenderer spriteRenderer;
+    public Sprite[] runSprites;
+    public Sprite climbSprite;
+    private int spriteIndex;
+
     private new Rigidbody2D rigidbody;
     private new Collider2D collider;
     private Collider2D[] results;
@@ -14,9 +19,20 @@ public class Player : MonoBehaviour
 
     private void Awake()
     {
+        spriteRenderer = GetComponent<SpriteRenderer>();
         rigidbody = GetComponent<Rigidbody2D>();
         collider = GetComponent<Collider2D>();
         results = new Collider2D[4];
+    }
+
+    private void OnEnable()
+    {
+        InvokeRepeating(nameof(AnimateSprite), 1f/12f, 1f/12f);
+    }
+
+    private void OnDisable()
+    {
+        CancelInvoke();
     }
 
     private void CheckCollision()
@@ -38,6 +54,7 @@ public class Player : MonoBehaviour
             {
                 grounded = hit.transform.position.y < (transform.position.y - 0.5f);
                 Physics2D.IgnoreCollision(collider, results[i], !grounded);
+
             } else if (hit.layer == LayerMask.NameToLayer("Ladder"))
             {
                 climbing = true;
@@ -48,8 +65,10 @@ public class Player : MonoBehaviour
     private void Update()
     {
         CheckCollision();
-
-        if (grounded && Input.GetButtonDown("Jump"))
+        if(climbing)
+        {
+            direction.y = Input.GetAxis("Vertical") * moveSpeed;
+        } else if (grounded && Input.GetButtonDown("Jump"))
         {
             direction = Vector2.up * jumpStrength;
         } else
@@ -76,5 +95,39 @@ public class Player : MonoBehaviour
     private void FixedUpdate()
     {
         rigidbody.MovePosition(rigidbody.position + direction * Time.fixedDeltaTime);    
+    }
+
+    private void AnimateSprite()
+    {
+        if (climbing)
+        {
+            spriteRenderer.sprite = climbSprite;
+        } else if (direction.x != 0f)
+        {
+            spriteIndex++;
+
+            if (spriteIndex >= runSprites.Length)
+            {
+                spriteIndex = 0;
+            }
+
+            spriteRenderer.sprite = runSprites[spriteIndex];
+        } else if (direction.x == 0f)
+        {
+            spriteRenderer.sprite = runSprites[0];
+        }
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Objective"))
+        {
+            enabled = false;
+            FindObjectOfType<GameManager>().LevelComplete();
+        } else if (collision.gameObject.CompareTag("Obstacle"))
+        {
+            enabled = false;
+            FindObjectOfType<GameManager>().LevelFailed();
+        }
     }
 }
